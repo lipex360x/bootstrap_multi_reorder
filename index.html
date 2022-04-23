@@ -1,0 +1,225 @@
+<script src="https://cdn.jsdelivr.net/npm/tablednd@1.0.5/dist/jquery.tablednd.min.js"></script>
+<style>
+  .toolbar { 
+    width: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around; 
+    margin: 0 auto; 
+    margin-bottom: 2rem 
+  }
+  .checked {
+    background: orange
+  }
+</style>
+
+<div class="toolbar">
+  <button onClick="setData()" class="btn btn-primary">Set Data</button>
+  <button onClick="saveData()" class="btn btn-success">Save Data</button>
+  <button onClick="console.clear()" class="btn btn-warning">Clear Console</button>
+  <button onClick="uncheckAll()" class="btn btn-warning">Clear Checkbox</button>
+</div>
+
+
+<table
+  id="table"
+  data-pagination="false"
+  data-search="false"
+  data-show-toggle="false"
+  data-filter-control="true"
+  data-use-row-attr-func="true"
+  data-reorderable-rows="true"
+	data-row-style="rowStyle"
+>
+  <thead>
+    <tr>
+      <th data-field="state" data-formatter="checkBox"></th>
+      <th data-field="id" data-filter-control="input">ID</th>
+      <th data-field="name" data-filter-control="input">Item Name</th>
+      <th data-field="price" data-filter-control="input">Item Price</th>
+    </tr>
+  </thead>
+</table>
+
+<script>
+  $(() => { $('#table').bootstrapTable() })
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+  const gridTable = $("#table")
+  const idField = 'id'
+  
+  const saveData = () => {
+    console.log('rowIdSelected', rowIdSelected)
+    console.log('originalData', originalData)
+  }
+  
+  
+  // ------------------------------ //
+  // ########## Checkbox ###########
+  // ------------------------------ //
+  function checkBox (_, row, index) {
+    const getChecked = row.state
+    const inputBox = `<input data-check=${row[idField]} type="checkbox" ${getChecked ? 'checked' : ''}/>`
+    return inputBox;
+  }
+	
+  // ------------------------------ //
+  // ########## Row Style ###########
+  // ------------------------------ //
+  function rowStyle(row, index) {    
+    if(row.state) return { classes: 'checked' }
+    
+    return {}
+  }
+  
+  // ------------------------------ //
+  // ########## Set Data ###########
+  // ------------------------------ //
+  const dataTable = []
+  for(let i = 1; i <= 10 ; i++) {
+    dataTable.push({
+      	state: false,
+        id: i,
+        name: `Item ${i}`,
+        price: `R$${i},00`
+    })
+  }
+  
+  
+  let originalData = []
+  const setData = (newDataTable = null) => {
+    gridTable.bootstrapTable('showLoading')
+      
+		!!newDataTable ? data = newDataTable : data = dataTable
+    
+    data = data.map((row) => {
+      row.state = rowIdSelected.some((id) => id === row[idField])
+      return row
+    })
+    
+    originalData = data
+    
+    gridTable.bootstrapTable('destroy')
+    gridTable.bootstrapTable({ data })
+    
+    gridTable.bootstrapTable('hideLoading')
+  }
+  
+  // ------------------------------ //
+  // ########## Check rows ##########
+  // ------------------------------ //
+  let rowIdSelected = [3, 4, 7]
+  let rowSelected = []
+   
+  gridTable.on('click-row.bs.table', function (_, row) {
+    originalData = gridTable.bootstrapTable('getData')
+    if(!reorder) setSelectItem(row, 'check') // Prevent click on reorder
+    reorder = false
+  })
+  
+  gridTable.on('check.bs.table', function (_, row) {
+    setSelectItem(row, 'check')
+  })
+
+  const setSelectItem = (row, action) => {
+    const tableData = gridTable.bootstrapTable('getData')
+    const rowId = tableData.find(tableRow => tableRow[idField] === row[idField])[idField]
+    const dataIndex = tableData.findIndex(tableRow => tableRow[idField] === row[idField])
+        
+    // Remove on uncheck
+    const findItem = rowIdSelected.find((id) => id == row[idField])
+    const getChecked = rowIdSelected.some((id) => id == row[idField])
+    
+    row.state = !getChecked
+    
+    rowIdSelected = rowIdSelected.filter((id) => id !== row[idField])
+    rowSelected = rowSelected.filter((item) => item[idField] !== row[idField])
+    
+    // Set Color
+    setColor(dataIndex, getChecked)
+    
+    // CheckBox
+    $(`[data-check=${rowId}]`).prop("checked", (!findItem))
+        
+    // Insert on check
+    if (findItem || rowIdSelected.find((id) => id === row[idField] )) return 
+    rowIdSelected.push(row[idField])
+    rowSelected.push(row)
+  }
+  
+  
+  // ------------------------------ //
+  // ####### Uncheck all rows #######
+  // ------------------------------ //
+  const uncheckAll = () => {
+    $("[type='checkbox']").prop("checked", false)
+    $('.checked').removeClass('checked')
+    rowIdSelected = []
+    rowSelected = []
+  } 
+  
+  
+  // ------------------------------ //
+  // ########## Set Color ##########
+  // ------------------------------ //
+  const setColor = (index, checked) => {
+    !checked && $(`[data-index=${index}]`).addClass("checked")
+    checked && $(`[data-index=${index}]`).removeClass("checked")
+  }
+  
+  
+  // ------------------------------ //
+  // ######## Reorder Rows #########
+  // ------------------------------ //
+  let reorder = false
+	gridTable.on('reorder-row.bs.table', async function (_, dataTable, rowSequence) {
+    reorder = true
+    const dataGridTable = gridTable.bootstrapTable('getData')
+    const indexPosition = dataTable.findIndex((row) => row[idField] === rowSequence[idField])
+		    
+    // Array with Checked
+    const withChecked = rowIdSelected.map((rowId) => dataTable.find(data => data[idField] === rowId))
+    
+    // Array without Checked
+    const withoutChecked = []
+    dataTable.forEach((row) => {
+      const notCheck = !withChecked.find((check) => check[idField] == row[idField])
+			notCheck && withoutChecked.push(row)
+    })
+    
+    // Search row in Array with Checked
+    originalData = dataTable
+    const rowInSelected = rowIdSelected.some((id) => id === rowSequence[idField])
+    if(!rowInSelected) return
+
+    let newDataTable = []
+
+    // Move to Top
+    if(indexPosition === 0) {
+      newDataTable = withChecked.concat(withoutChecked)
+      setData(newDataTable)
+    }
+    
+    // Move to other position
+    if(indexPosition !== 0) {
+      const rowAfter = originalData[indexPosition - 1]
+      const indexInWithoutChecked = withoutChecked.findIndex((row) => row[idField] === rowAfter[idField])
+      
+      // Move between selected
+      if(indexInWithoutChecked < 0) return
+      
+      withoutChecked.map((row, index) => {
+      	  newDataTable.push(row)
+        	
+        	if(index === indexInWithoutChecked) {
+            withChecked.map((row) => {
+              newDataTable.push(row)
+            })
+          }
+      })
+      
+      setData(newDataTable)
+    }   
+
+  })
+  
+</script>
