@@ -1,0 +1,190 @@
+<script src="https://cdn.jsdelivr.net/npm/tablednd@1.0.5/dist/jquery.tablednd.min.js"></script>
+<style>
+  .toolbar { 
+    width: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around; 
+    margin: 0 auto; 
+    margin-bottom: 2rem 
+  }
+  .selected {
+    background: orange
+  }
+</style>
+
+<div class="toolbar">
+  <button onClick="setData()" class="btn btn-primary">Set Data</button>
+  <button onClick="saveData()" class="btn btn-success">Save Data</button>
+  <button onClick="console.clear()" class="btn btn-warning">Clear Console</button>
+  <button onClick="uncheckAll()" class="btn btn-warning">Clear Checkbox</button>
+</div>
+
+
+<table
+  id="table"
+  data-pagination="false"
+  data-search="false"
+  data-show-toggle="false"
+  data-filter-control="true"
+  data-use-row-attr-func="true"
+  data-reorderable-rows="true"
+  data-click-to-select="true"
+  data-row-style="rowStyle"
+>
+  <thead>
+    <tr>
+      <th data-field="state" data-formatter="setState" data-checkbox="true"></th>
+      <th data-field="id" data-filter-control="input">ID</th>
+      <th data-field="name" data-filter-control="input">Name</th>
+      <th data-field="price" data-filter-control="input">Price</th>
+      <th data-field="amount" data-filter-control="input">Amount</th>
+    </tr>
+  </thead>
+</table>
+
+<script>
+  $(() => { $('#table').bootstrapTable() })
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+  const gridTable = $("#table")
+  const idField = 'id'
+  
+  const saveData = () => {
+    console.log('rowIdSelected', rowIdSelected)
+    console.log('originalData', originalData)
+  }
+  
+  
+  // ------------------------------ //
+  // ########## Checkbox ###########
+  // ------------------------------ //
+  function checkBox (_, row, index) {
+    const getChecked = row.state
+    const inputBox = `<input data-check=${row[idField]} type="checkbox" ${getChecked ? 'checked' : ''}/>`
+    return inputBox;
+  }
+  
+  function setState(_, row, index) {
+    return rowIdSelected.some((id) => id === row[idField])
+  }
+	
+  // ------------------------------ //
+  // ########## Row Style ###########
+  // ------------------------------ //
+  function rowStyle(row, index) {    
+    if(row.state) return { classes: 'checked' }
+    
+    return {}
+  }
+  
+  // ------------------------------ //
+  // ########## Set Data ###########
+  // ------------------------------ //
+  
+  let originalData = []
+  const setData = (newDataTable = null) => {    
+    const tableUrl = 'https://live.bootstrap-table.com/json/data1.json'
+    
+    gridTable.bootstrapTable('destroy')
+    
+    if(newDataTable) return gridTable.bootstrapTable({ data: newDataTable })   
+    
+    gridTable.bootstrapTable({ url: tableUrl })
+  }
+  
+  // ------------------------------ //
+  // ########## Check rows ##########
+  // ------------------------------ //
+  let rowIdSelected = [6, 8, 11]  
+
+  gridTable.on('check.bs.table', function (_, row) {
+    setSelectItem(row, 'check')
+    console.log('checked')
+  })
+
+  gridTable.on('check.bs.table', function (_, row) {
+    setSelectItem(row, 'check')
+  })
+
+  gridTable.on('uncheck.bs.table', function (_, row) {
+    setSelectItem(row, 'uncheck')
+  })
+
+  gridTable.on('check-all.bs.table', function (_, rows) {
+    $.each(rows, function(_, row){
+      setSelectItem(row, 'check')
+    })
+  })
+
+  gridTable.on('uncheck-all.bs.table', function () {
+    rowIdSelected = []
+  });
+
+  function setSelectItem(row, action) {
+    const tableField = 'id'
+    const idField = row[tableField]
+
+    // Remove ao desmarcar
+    rowIdSelected = rowIdSelected.filter(id => id !== idField)
+
+    // Insere ao marcar
+    if (action !== 'check') return
+
+    rowIdSelected.push(idField)
+  }
+  
+  
+  // ------------------------------ //
+  // ######## Reorder Rows #########
+  // ------------------------------ //
+	gridTable.on('reorder-row.bs.table', async function (_, dataTable, rowSequence) {
+    const dataGridTable = gridTable.bootstrapTable('getData')
+    const indexPosition = dataTable.findIndex((row) => row[idField] === rowSequence[idField])
+		    
+    // Array with Checked
+    const withChecked = rowIdSelected.map((rowId) => dataTable.find(data => data[idField] === rowId))
+    
+    // Array without Checked
+    const withoutChecked = []
+    dataTable.forEach((row) => {
+      const notCheck = !withChecked.find((check) => check[idField] == row[idField])
+			notCheck && withoutChecked.push(row)
+    })
+    
+    // Search row in Array with Checked
+    originalData = dataTable
+    const rowInSelected = rowIdSelected.some((id) => id === rowSequence[idField])
+    if(!rowInSelected) return
+
+    let newDataTable = []
+
+    // Move to Top
+    if(indexPosition === 0) {
+      newDataTable = withChecked.concat(withoutChecked)
+      setData(newDataTable)
+    }
+    
+    // Move to other position
+    if(indexPosition !== 0) {
+      const rowAfter = originalData[indexPosition - 1]
+      const indexInWithoutChecked = withoutChecked.findIndex((row) => row[idField] === rowAfter[idField])
+      
+      // Move between selected
+      if(indexInWithoutChecked < 0) return
+      
+      withoutChecked.map((row, index) => {
+      	  newDataTable.push(row)
+        	
+        	if(index === indexInWithoutChecked) {
+            withChecked.map((row) => {
+              newDataTable.push(row)
+            })
+          }
+      })
+      
+      setData(newDataTable)
+    }   
+
+  })
+  
+</script>
